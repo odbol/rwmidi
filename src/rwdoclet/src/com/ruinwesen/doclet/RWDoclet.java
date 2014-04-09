@@ -1,4 +1,4 @@
-package com.ruinwesen.doclet;
+package rwdoclet.src.com.ruinwesen.doclet;
 
 import java.io.File;
 import java.io.FileNotFoundException;
