@@ -18,10 +18,9 @@ import javax.sound.midi.Transmitter;
  * to register callbacks to your objects. Use {@link MidiInput-close} to clear the callback list, and use {@link MidiInput-closeMidi} 
  * to close the corresponding MidiDevice (however, this will close all MidiInputs connected to this device). 
  */
-public class MidiInput implements Receiver {
+public class MidiInput extends MidiInputBase  {
 
-	javax.sound.midi.MidiDevice jDevice;
-    final List currentMessage = new ArrayList();
+	final List currentMessage = new ArrayList();
     final List<Plug> plugList = new CopyOnWriteArrayList<Plug>();
 	int divisions = 0;
 	long pulseOne = 0;
@@ -34,35 +33,15 @@ public class MidiInput implements Receiver {
 	 * @throws MidiUnavailableException
 	 */
 	public MidiInput(javax.sound.midi.MidiDevice dev2) throws MidiUnavailableException {
-		this.jDevice = dev2;
-		if (!dev2.isOpen())
-			dev2.open();
-		Transmitter trsmt = dev2.getTransmitter();
-		trsmt.setReceiver(this);
+		super(dev2);
+		
+		super.setReceiver(new MidiListener());
 	}
 
 	protected MidiInput(MidiInputDevice _device) throws MidiUnavailableException {
 		this(_device.getDevice());
 	}
 
-	public String getName() {
-		javax.sound.midi.MidiDevice.Info info = jDevice.getDeviceInfo();
-		return info.getName() + " " + info.getVendor();
-	}
-
-	/**
-	 * Close the MIDI device attached to this input. This will close all the other inputs as well.
-	 */
-	public void closeMidi() {
-		jDevice.close();
-	}
-
-	/**
-	 * Close the MIDI input.
-	 */
-	public void close() {
-		plugList.clear();
-	}
 
 	public static void printHex(byte[] b) {
 		printHex(b, 0, b.length);
@@ -116,51 +95,69 @@ public class MidiInput implements Receiver {
 		}
 	}
 
-	public void send(final MidiMessage message, final long timeStamp) {
-		//		if ((message.getLength() >= 1)) {
-		//			System.out.println("message " + message);
-		//			printHex(message.getMessage());
-		//		}
-		if (message instanceof javax.sound.midi.SysexMessage || message.getStatus() == (byte)0xF7) {
-			if (message.getStatus() == 0xF0) {
-				//				System.out.println("clear message and start new ");
-				currentMessage.clear(); // no shortcut for sysex messages
-				currentMessage.add((byte)0xF0);
-			}
-			addSysexBytes(((javax.sound.midi.SysexMessage)message).getData());
-			///
-		} else {
-			//commenting out to enable midi sync messages
-			//			if (message.getStatus() >= 0xF8) {
-			//				return;
-			//			} else {
-			if (message.getStatus() == 0xF7) {
-				addSysexBytes(message.getMessage());
-				return;
-			}
-			//			}
-			for (Plug plug : plugList) 
-				plug.callPlug(this, message);
-			if (message.getStatus() == SyncEvent.TIMING_CLOCK && divisions != 0){
-				calculatePulseSpace();
-				for (int i = 1; i < divisions; i++){
-					if (pulseTime > 5){
-						try {
-							Thread.sleep(pulseTime);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
+	/**
+	 * Listens to midi events and calls plugs accordingly.
+	 * This way, we don't expose the listener API to the public.
+	 * 
+	 * @author tyler
+	 *
+	 */
+	private class MidiListener implements Receiver {
+		
+		public void send(final MidiMessage message, final long timeStamp) {
+			//		if ((message.getLength() >= 1)) {
+			//			System.out.println("message " + message);
+			//			printHex(message.getMessage());
+			//		}
+			if (message instanceof javax.sound.midi.SysexMessage || message.getStatus() == (byte)0xF7) {
+				if (message.getStatus() == 0xF0) {
+					//				System.out.println("clear message and start new ");
+					currentMessage.clear(); // no shortcut for sysex messages
+					currentMessage.add((byte)0xF0);
+				}
+				addSysexBytes(((javax.sound.midi.SysexMessage)message).getData());
+				///
+			} else {
+				//commenting out to enable midi sync messages
+				//			if (message.getStatus() >= 0xF8) {
+				//				return;
+				//			} else {
+				if (message.getStatus() == 0xF7) {
+					addSysexBytes(message.getMessage());
+					return;
+				}
+				//			}
+				for (Plug plug : plugList) 
+					plug.callPlug(MidiInput.this, message);
+				if (message.getStatus() == SyncEvent.TIMING_CLOCK && divisions != 0){
+					calculatePulseSpace();
+					for (int i = 1; i < divisions; i++){
+						if (pulseTime > 5){
+							try {
+								Thread.sleep(pulseTime);
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
 						}
+						for (Plug plug : plugList) 
+							plug.callPlug(MidiInput.this, message);
 					}
-					for (Plug plug : plugList) 
-						plug.callPlug(this, message);
+				}
+				if (message.getStatus() == SyncEvent.STOP && divisions != 0){
+					pulseOne = 0;
+					pulseTwo = 0;
+					pulseTime = 0;
 				}
 			}
-			if (message.getStatus() == SyncEvent.STOP && divisions != 0){
-				pulseOne = 0;
-				pulseTwo = 0;
-				pulseTime = 0;
-			}
+		}
+		
+
+		/**
+		 * Close the MIDI input.
+		 */
+		public void close() {
+			plugList.clear();
 		}
 	}
 
