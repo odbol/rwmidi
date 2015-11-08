@@ -6,7 +6,7 @@ import javax.sound.midi.Transmitter;
 
 public class MidiInputBase {
 
-	protected javax.sound.midi.MidiDevice jDevice;
+	final protected javax.sound.midi.MidiDevice jDevice;
 
 	/**
 	 * Create a MidiInput from a javax.sound.midi.MidiDevice . Don't use this unless you know what you are doing.

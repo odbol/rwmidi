@@ -2,6 +2,7 @@ package rwmidi;
 
 import javax.sound.midi.MidiUnavailableException;
 import javax.sound.midi.MidiDevice.Info;
+import javax.sound.midi.Receiver;
 
 /**
  * Represents a device that can be opened for reading and receiving MIDI messages. An object with callbacks can
@@ -54,5 +55,23 @@ public class MidiInputDevice extends MidiDevice {
 		MidiInput input = createInput();
 		input.divisions = convertTo/24;
 		return input;
+	}
+	
+	/**
+	 * Create an input object for the device.
+	 * 
+	 * @param receiver Your own custom MIDI Receiver to deal with MIDI messages. 
+	 * 					This bypasses most of RWMidi's convenience functions, but can be much faster. 
+	 * @return the created input
+	 */
+	public MidiInputBase createInputWithCustomReceiver(Receiver receiver) {
+		try {
+			MidiInputBase dev = new MidiInputBase(getDevice());
+			dev.setReceiver(receiver);
+			return dev;
+		} catch (MidiUnavailableException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 }
